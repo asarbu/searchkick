@@ -440,7 +440,8 @@ module Searchkick
         set_boost_by_indices(payload)
 
         # filters
-        filters = where_filters(options[:where])
+        filters = nested_filters(options[:where]&.delete('nested')) || {}
+        filters = filters + where_filters(options[:where])
         set_filters(payload, filters) if filters.any?
 
         # aggregations
@@ -722,6 +723,20 @@ module Searchkick
       order = options[:order].is_a?(Enumerable) ? options[:order] : {options[:order] => :asc}
       id_field = below50? ? :_id : :_uid
       payload[:sort] = order.is_a?(Array) ? order : Hash[order.map { |k, v| [k.to_s == "id" ? id_field : k, v] }]
+    end
+
+    def nested_filters(nested)
+      return [] if nested.nil?
+      [{
+        nested: {
+          path: nested['path'],
+          query: {
+            bool: {
+              filter: where_filters(nested['where'])
+            }
+          }
+        }
+      }]
     end
 
     def where_filters(where)
